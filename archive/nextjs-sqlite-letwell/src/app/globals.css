@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas: #f7f4ef;
+  --ink: #14201d;
+  --teal: #1f5c55;
+  --teal-deep: #163f3b;
+  --muted: rgba(20, 32, 29, 0.65);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(31, 92, 85, 0.08), transparent 40%),
+    radial-gradient(circle at top right, rgba(139, 105, 20, 0.06), transparent 35%),
+    var(--canvas);
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(31, 92, 85, 0.2);
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: local("Instrument Sans"), local("Segoe UI"), local("Helvetica Neue");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Instrument Serif";
+  src: local("Instrument Serif"), local("Georgia"), local("Times New Roman");
+  font-display: swap;
+  font-style: normal;
+}

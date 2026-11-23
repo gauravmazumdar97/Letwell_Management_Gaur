@@ -1,0 +1,6 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-label="Canal-side maisonette">
+  <rect width="1200" height="500" fill="#b7c9c3"/>
+  <rect y="500" width="1200" height="300" fill="#3d6b7a"/>
+  <rect x="420" y="220" width="360" height="320" fill="#f0ebe3"/>
+  <text x="80" y="120" fill="#14201d" font-family="Georgia, serif" font-size="40">Hackney Wick</text>
+</svg>

@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  TENANT
+  LANDLORD
+  ADMIN
+}
+
+enum AccountStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum PropertyType {
+  FLAT
+  HOUSE
+  STUDIO
+  MAISONETTE
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  OCCUPIED
+  UNAVAILABLE
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum EnquiryStatus {
+  SUBMITTED
+  ACCEPTED
+  DECLINED
+}
+
+enum LeaseStatus {
+  DRAFT
+  ACTIVE
+  ENDED
+}
+
+enum ChargeStatus {
+  DUE
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum ReminderType {
+  RENT_OVERDUE
+}
+
+enum MaintenanceCategory {
+  PLUMBING
+  ELECTRICAL
+  HEATING
+  APPLIANCE
+  STRUCTURAL
+  OTHER
+}
+
+enum MaintenanceUrgency {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+enum MaintenanceStatus {
+  SUBMITTED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  name         String
+  role         Role
+  status       AccountStatus @default(PENDING)
+  phone        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  properties          Property[]          @relation("LandlordProperties")
+  enquiries           Enquiry[]           @relation("TenantEnquiries")
+  leasesAsTenant      Lease[]             @relation("TenantLeases")
+  maintenanceRequests MaintenanceRequest[] @relation("TenantMaintenance")
+  notifications       Notification[]
+  statusChanges       MaintenanceStatusHistory[] @relation("StatusActor")
+}
+
+model Worker {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  trade     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments MaintenanceRequest[]
+}
+
+model Property {
+  id           String         @id @default(cuid())
+  landlordId   String
+  title        String
+  description  String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  postcode     String
+  neighbourhood String
+  propertyType PropertyType
+  bedrooms     Int
+  bathrooms    Int
+  furnished    Boolean        @default(false)
+  amenities    String
+  status       PropertyStatus @default(AVAILABLE)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  landlord    User                  @relation("LandlordProperties", fields: [landlordId], references: [id])
+  listing     Listing?
+  images      PropertyImage[]
+  enquiries   Enquiry[]
+  leases      Lease[]
+  maintenance MaintenanceRequest[]
+
+  @@index([landlordId])
+  @@index([status, city])
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String
+  url        String
+  alt        String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+}
+
+model Listing {
+  id              String        @id @default(cuid())
+  propertyId      String        @unique
+  status          ListingStatus @default(DRAFT)
+  headline        String
+  monthlyRentPence Int
+  availableFrom   DateTime?
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([status, monthlyRentPence])
+}
+
+model Enquiry {
+  id         String        @id @default(cuid())
+  propertyId String
+  tenantId   String
+  message    String
+  status     EnquiryStatus @default(SUBMITTED)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id])
+  tenant   User     @relation("TenantEnquiries", fields: [tenantId], references: [id])
+  lease    Lease?
+
+  @@index([propertyId])
+  @@index([tenantId])
+}
+
+model Lease {
+  id               String      @id @default(cuid())
+  propertyId       String
+  tenantId         String
+  enquiryId        String?     @unique
+  status           LeaseStatus @default(DRAFT)
+  startDate        DateTime
+  endDate          DateTime
+  monthlyRentPence Int
+  dueDay           Int
+  activatedAt      DateTime?
+  endedAt          DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  property  Property             @relation(fields: [propertyId], references: [id])
+  tenant    User                 @relation("TenantLeases", fields: [tenantId], references: [id])
+  enquiry   Enquiry?             @relation(fields: [enquiryId], references: [id])
+  charges   RentCharge[]
+  requests  MaintenanceRequest[]
+
+  @@index([propertyId, status])
+  @@index([tenantId])
+}
+
+model RentCharge {
+  id          String       @id @default(cuid())
+  leaseId     String
+  periodYear  Int
+  periodMonth Int
+  dueDate     DateTime
+  amountPence Int
+  status      ChargeStatus @default(DUE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  lease     Lease      @relation(fields: [leaseId], references: [id])
+  payment   Payment?
+  reminders Reminder[]
+
+  @@unique([leaseId, periodYear, periodMonth])
+  @@index([dueDate, status])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  chargeId    String   @unique
+  amountPence Int
+  paidAt      DateTime @default(now())
+  methodLabel String   @default("Demo payment")
+  receiptRef  String   @unique
+  createdAt   DateTime @default(now())
+
+  charge RentCharge @relation(fields: [chargeId], references: [id])
+}
+
+model Reminder {
+  id        String       @id @default(cuid())
+  chargeId  String
+  userId    String
+  type      ReminderType
+  message   String
+  createdAt DateTime     @default(now())
+
+  charge RentCharge @relation(fields: [chargeId], references: [id])
+
+  @@unique([chargeId, type])
+  @@index([userId])
+}
+
+model MaintenanceRequest {
+  id          String              @id @default(cuid())
+  leaseId     String
+  propertyId  String
+  tenantId    String
+  workerId    String?
+  title       String
+  description String
+  category    MaintenanceCategory
+  urgency     MaintenanceUrgency
+  status      MaintenanceStatus   @default(SUBMITTED)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  lease       Lease                      @relation(fields: [leaseId], references: [id])
+  property    Property                   @relation(fields: [propertyId], references: [id])
+  tenant      User                       @relation("TenantMaintenance", fields: [tenantId], references: [id])
+  worker      Worker?                    @relation(fields: [workerId], references: [id])
+  history     MaintenanceStatusHistory[]
+  notifications Notification[]
+
+  @@index([status, urgency])
+  @@index([tenantId])
+  @@index([propertyId])
+}
+
+model MaintenanceStatusHistory {
+  id          String            @id @default(cuid())
+  requestId   String
+  fromStatus  MaintenanceStatus?
+  toStatus    MaintenanceStatus
+  note        String?
+  actorUserId String?
+  createdAt   DateTime          @default(now())
+
+  request MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor   User?              @relation("StatusActor", fields: [actorUserId], references: [id])
+
+  @@index([requestId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  requestId String?
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  request MaintenanceRequest? @relation(fields: [requestId], references: [id])
+
+  @@index([userId, readAt])
+}

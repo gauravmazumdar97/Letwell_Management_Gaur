@@ -1,0 +1,24 @@
+{
+  "name": "letwell",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @letwell/api & npm run dev -w @letwell/web",
+    "dev:api": "npm run dev -w @letwell/api",
+    "dev:web": "npm run dev -w @letwell/web",
+    "build": "npm run build -w @letwell/api && npm run build -w @letwell/web",
+    "lint": "npm run lint -w @letwell/api && npm run lint -w @letwell/web",
+    "typecheck": "npm run typecheck -w @letwell/api && npm run typecheck -w @letwell/web",
+    "db:migrate": "npm run db:migrate -w @letwell/api",
+    "db:seed": "npm run db:seed -w @letwell/api",
+    "db:reset": "npm run db:reset -w @letwell/api",
+    "test": "npm run test -w @letwell/api"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

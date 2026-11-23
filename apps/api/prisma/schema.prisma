@@ -1,0 +1,403 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  TENANT
+  MANAGER
+  ADMIN
+}
+
+enum AccountStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PropertyStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+  UNAVAILABLE
+}
+
+enum PricingUnit {
+  MONTHLY
+  DAILY
+  NIGHTLY
+  EVENT
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RentalStatus {
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  DUE
+  PARTIALLY_PAID
+  PAID
+  VOID
+  OVERDUE
+}
+
+enum MaintenanceCategory {
+  PLUMBING
+  ELECTRICAL
+  HEATING
+  APPLIANCE
+  STRUCTURAL
+  OTHER
+}
+
+enum MaintenanceUrgency {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+enum MaintenanceStatus {
+  SUBMITTED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  name         String
+  phone        String?
+  status       AccountStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  roles                UserRole[]
+  managerApplication   ManagerApplication?
+  properties           Property[]              @relation("ManagerProperties")
+  bookings             Booking[]               @relation("TenantBookings")
+  rentals              Rental[]                @relation("TenantRentals")
+  maintenanceRequests  MaintenanceRequest[]    @relation("TenantMaintenance")
+  notifications        Notification[]
+  auditLogs            AuditLog[]              @relation("AuditActor")
+  statusChanges        MaintenanceStatusHistory[] @relation("StatusActor")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  role      Role
+  grantedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([userId])
+}
+
+model ManagerApplication {
+  id           String            @id @default(cuid())
+  userId       String            @unique
+  message      String
+  status       ApplicationStatus @default(PENDING)
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewNote   String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  properties Property[]
+}
+
+model Property {
+  id              String         @id @default(cuid())
+  managerId       String
+  categoryId      String?
+  title           String
+  description     String
+  addressLine1    String
+  addressLine2    String?
+  city            String
+  postcode        String
+  neighbourhood   String
+  country         String         @default("United Kingdom")
+  pricingUnit     PricingUnit    @default(MONTHLY)
+  pricePence      Int
+  bedrooms        Int            @default(1)
+  bathrooms       Int            @default(1)
+  maxGuests       Int?
+  amenitiesJson   String         @default("[]")
+  status          PropertyStatus @default(DRAFT)
+  rejectionReason String?
+  suspensionReason String?
+  approvedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  manager    User                 @relation("ManagerProperties", fields: [managerId], references: [id])
+  category   Category?            @relation(fields: [categoryId], references: [id])
+  images     PropertyImage[]
+  bookings   Booking[]
+  rentals    Rental[]
+  maintenance MaintenanceRequest[]
+
+  @@index([managerId])
+  @@index([status, city])
+  @@index([pricingUnit, pricePence])
+}
+
+model PropertyImage {
+  id         String   @id @default(cuid())
+  propertyId String
+  url        String
+  alt        String
+  sortOrder  Int      @default(0)
+  storage    String   @default("local")
+  createdAt  DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+}
+
+model Booking {
+  id              String        @id @default(cuid())
+  propertyId      String
+  tenantId        String
+  status          BookingStatus @default(PENDING)
+  startDate       DateTime
+  endDate         DateTime
+  pricingUnit     PricingUnit
+  quotedPricePence Int
+  message         String?
+  decidedAt       DateTime?
+  decisionNote    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  property Property @relation(fields: [propertyId], references: [id])
+  tenant   User     @relation("TenantBookings", fields: [tenantId], references: [id])
+  rental   Rental?
+
+  @@index([propertyId, status])
+  @@index([tenantId])
+}
+
+model Rental {
+  id               String       @id @default(cuid())
+  bookingId        String       @unique
+  propertyId       String
+  tenantId         String
+  status           RentalStatus @default(ACTIVE)
+  startDate        DateTime
+  endDate          DateTime
+  pricingUnit      PricingUnit
+  agreedPricePence Int
+  activatedAt      DateTime     @default(now())
+  endedAt          DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  booking  Booking              @relation(fields: [bookingId], references: [id])
+  property Property             @relation(fields: [propertyId], references: [id])
+  tenant   User                 @relation("TenantRentals", fields: [tenantId], references: [id])
+  invoices Invoice[]
+  maintenance MaintenanceRequest[]
+
+  @@index([propertyId, status])
+  @@index([tenantId])
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  rentalId        String
+  status          InvoiceStatus @default(DUE)
+  periodStart     DateTime
+  periodEnd       DateTime
+  dueDate         DateTime
+  amountPence     Int
+  amountPaidPence Int           @default(0)
+  currency        String        @default("GBP")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  rental   Rental    @relation(fields: [rentalId], references: [id])
+  payments Payment[]
+
+  @@index([rentalId])
+  @@index([dueDate, status])
+}
+
+model Payment {
+  id                 String   @id @default(cuid())
+  invoiceId          String
+  amountPence        Int
+  currency           String   @default("GBP")
+  stripeSessionId    String?  @unique
+  stripePaymentIntentId String? @unique
+  status             String
+  paidAt             DateTime?
+  platformFeePence   Int      @default(0)
+  feeBpsSnapshot     Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  invoice  Invoice          @relation(fields: [invoiceId], references: [id])
+  attempts PaymentAttempt[]
+  earning  Earning?
+
+  @@index([invoiceId])
+}
+
+model PaymentAttempt {
+  id              String   @id @default(cuid())
+  paymentId       String
+  stripeEventId   String?  @unique
+  status          String
+  rawPayloadJson  String?
+  createdAt       DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+}
+
+model Earning {
+  id              String   @id @default(cuid())
+  paymentId       String   @unique
+  managerId       String
+  grossPence      Int
+  feePence        Int
+  netPence        Int
+  feeBpsSnapshot  Int
+  createdAt       DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+}
+
+model Worker {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  trade     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments MaintenanceRequest[]
+}
+
+model MaintenanceRequest {
+  id          String              @id @default(cuid())
+  rentalId    String
+  propertyId  String
+  tenantId    String
+  workerId    String?
+  title       String
+  description String
+  category    MaintenanceCategory
+  urgency     MaintenanceUrgency
+  status      MaintenanceStatus   @default(SUBMITTED)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  rental   Rental                      @relation(fields: [rentalId], references: [id])
+  property Property                    @relation(fields: [propertyId], references: [id])
+  tenant   User                        @relation("TenantMaintenance", fields: [tenantId], references: [id])
+  worker   Worker?                     @relation(fields: [workerId], references: [id])
+  history  MaintenanceStatusHistory[]
+  notifications Notification[]
+
+  @@index([status, urgency])
+  @@index([tenantId])
+  @@index([propertyId])
+}
+
+model MaintenanceStatusHistory {
+  id          String             @id @default(cuid())
+  requestId   String
+  fromStatus  MaintenanceStatus?
+  toStatus    MaintenanceStatus
+  note        String?
+  actorUserId String?
+  createdAt   DateTime           @default(now())
+
+  request MaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor   User?              @relation("StatusActor", fields: [actorUserId], references: [id])
+
+  @@index([requestId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  requestId String?
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  request MaintenanceRequest? @relation(fields: [requestId], references: [id])
+
+  @@index([userId, readAt])
+}
+
+model PlatformSettings {
+  id               String   @id @default("default")
+  platformFeeBps   Int      @default(1000)
+  supportEmail     String   @default("support@letwell.test")
+  updatedAt        DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+}
