@@ -1,4 +1,11 @@
+import { mockGetProperty, mockListProperties } from "@/lib/mock-properties";
+
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
+
+/** Demo mode when forced, or on production builds with no API URL (frontend-only deploy). */
+export const USE_MOCK_API =
+  import.meta.env.VITE_USE_MOCK === "true" ||
+  (import.meta.env.PROD && !import.meta.env.VITE_API_URL);
 
 export type Role = "TENANT" | "MANAGER" | "ADMIN";
 export type AccountStatus = "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
@@ -40,7 +47,32 @@ export function setActiveRole(role: Role | null): void {
   else localStorage.removeItem("letwell_active_role");
 }
 
+async function mockApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method !== "GET") {
+    throw new ApiError(501, "This action needs the live API");
+  }
+
+  const pathOnly = path.split("?")[0];
+  if (pathOnly === "/api/properties") {
+    return mockListProperties(path) as T;
+  }
+
+  const detailMatch = pathOnly.match(/^\/api\/properties\/([^/]+)$/);
+  if (detailMatch) {
+    const property = mockGetProperty(decodeURIComponent(detailMatch[1]));
+    if (!property) throw new ApiError(404, "Property not found");
+    return property as T;
+  }
+
+  throw new ApiError(404, "Not found in demo data");
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (USE_MOCK_API) {
+    return mockApi<T>(path, init);
+  }
+
   const headers = new Headers(init.headers);
   if (!headers.has("Content-Type") && init.body) {
     headers.set("Content-Type", "application/json");

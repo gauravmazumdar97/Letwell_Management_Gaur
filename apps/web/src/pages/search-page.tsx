@@ -98,7 +98,7 @@ export function SearchPage() {
       {isLoading ? <p className="mt-4 text-sm text-ink/60">Loading...</p> : null}
       {isError ? (
         <p className="mt-4 text-sm text-red-700" role="alert">
-          Search failed. Confirm the API is reachable.
+          Search failed. Try refreshing the page.
         </p>
       ) : null}
 

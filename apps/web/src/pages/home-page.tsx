@@ -52,7 +52,7 @@ export function HomePage() {
             <p className="text-sm uppercase tracking-[0.2em] text-canvas/70">Start here</p>
             <p className="mt-3 font-serif text-3xl leading-tight">Find a home that fits your week</p>
             <p className="mt-3 text-sm text-canvas/75">
-              Filters stay in the URL. Every public card is loaded from the live Letwell API.
+              Filters stay in the URL. Browse curated London homes and open any listing for details.
             </p>
             <Link to="/search" className="mt-6 inline-block">
               <Button className="bg-canvas text-ink hover:bg-white">Browse all homes</Button>
@@ -75,7 +75,7 @@ export function HomePage() {
         {isLoading ? <p className="mt-8 text-sm text-ink/60">Loading homes...</p> : null}
         {isError ? (
           <p className="mt-8 text-sm text-red-700" role="alert">
-            Could not load homes. Check that the API is running on port 4000.
+            Could not load homes. Try refreshing the page.
           </p>
         ) : null}
 
